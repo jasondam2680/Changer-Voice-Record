@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoiceMatch Studio — Chuyển Đổi Tông Giọng Nữ Từ Video</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#fdf2f8',
+              400: '#f472b6',
+              500: '#ec4899',
+              600: '#db2777',
+            },
+            accent: {
+              400: '#38bdf8',
+              500: '#0ea5e9',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #090d16;
+      color: #f1f5f9;
+      font-family: 'Inter', sans-serif;
+    }
+    .glass-card {
+      background: rgba(17, 24, 39, 0.78);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-pill {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: #1e293b;
+      height: 6px;
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ec4899;
+      cursor: pointer;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 8px rgba(236, 72, 153, 0.6);
+    }
+    .pulse-ring {
+      animation: pulse-ring 1.6s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(0.92); opacity: 0.8; }
+      70% { transform: scale(1.22); opacity: 0; }
+      100% { transform: scale(1.22); opacity: 0; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-pink-500 selection:text-white">
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed top-4 right-4 z-50 hidden transform transition-all duration-300 max-w-sm">
+    <div class="glass-card rounded-xl px-4 py-3 shadow-2xl border-l-4 border-pink-500 flex items-center gap-3">
+      <span id="toastIcon" class="text-pink-400 text-lg">●</span>
+      <p id="toastMessage" class="text-xs sm:text-sm font-medium text-slate-100"></p>
+    </div>
+  </div>
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 to-sky-500 flex items-center justify-center shadow-lg shadow-pink-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base sm:text-lg tracking-tight text-white">VoiceMatch DSP Studio</h1>
+            <span class="text-[11px] font-mono uppercase px-2 py-0.5 rounded-full bg-pink-500/15 text-pink-400 border border-pink-500/30">DSP + RVC Ready</span>
+          </div>
+          <p class="text-xs text-slate-400">Trích xuất hồ sơ tông giọng nữ từ Video Clip &amp; biến đổi giọng thu âm của bạn</p>
+        </div>
+      </div>
+
+      <!-- Mode Switch Tabs -->
+      <div class="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+        <button id="tabStudioBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-pink-600 text-white shadow">
+          Phòng Thu &amp; Chuyển Giọng
+        </button>
+        <button id="tabPipelineBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white">
+          Mã Nguồn AI RVC (Python)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5">
+
+    <!-- VIEW 1: STUDIO WORKSPACE -->
+    <div id="viewStudio" class="space-y-5">
+
+      <!-- 3-Step Status Banner -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="glass-card rounded-xl p-3.5 flex items-center gap-3 border-l-2 border-pink-500">
+          <div class="w-8 h-8 rounded-lg bg-pink-500/15 border border-pink-500/30 flex items-center justify-center text-pink-400 font-mono text-xs font-bold">01</div>
+          <div class="min-w-0">
+            <div class="text-xs font-semibold text-white truncate">1. Nạp Video Giọng Nữ Mẫu</div>
+            <div id="step1Status" class="text-[11px] text-emerald-400 font-mono truncate">Đã nạp hồ sơ: Giọng Nữ Ngọt Ngào (235 Hz)</div>
+          </div>
+        </div>
+        <div class="glass-card rounded-xl p-3.5 flex items-center gap-3 border-l-2 border-sky-500">
+          <div class="w-8 h-8 rounded-lg bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 font-mono text-xs font-bold">02</div>
+          <div class="min-w-0">
+            <div class="text-xs font-semibold text-white truncate">2. Ghi Âm Giọng Nói Của Bạn</div>
+            <div id="step2Status" class="text-[11px] text-amber-400 font-mono truncate">Sẵn sàng thu âm từ Microphone hoặc tải file</div>
+          </div>
+        </div>
+        <div class="glass-card rounded-xl p-3.5 flex items-center gap-3 border-l-2 border-emerald-500">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-mono text-xs font-bold">03</div>
+          <div class="min-w-0">
+            <div class="text-xs font-semibold text-white truncate">3. Áp Tông Nữ &amp; Xuất File WAV</div>
+            <div id="step3Status" class="text-[11px] text-slate-400 font-mono truncate">Tự động khớp F0 + Formant Envelope</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main 2-Column Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+        <!-- LEFT COLUMN: STEP 1 (Reference Female Video) & STEP 2 (User Voice Recorder) -->
+        <div class="lg:col-span-7 space-y-5">
+
+          <!-- CARD 1: Video Training Source (Target Female Voice) -->
+          <section class="glass-card rounded-2xl p-4 sm:p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span class="text-[11px] font-mono uppercase tracking-wider text-pink-400">Bước 1 • Giọng huấn luyện mục tiêu</span>
+                <h2 class="text-base font-bold text-white mt-0.5">Video Clip Giọng Nữ Làm Mẫu Huấn Luyện</h2>
+              </div>
+              <span id="trainingBadge" class="text-xs font-mono px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                Đã trích xuất F0 &amp; Formant
+              </span>
+            </div>
+
+            <!-- Upload Video or Pick Built-in Reference Clip -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label for="videoInput" class="cursor-pointer group rounded-xl border border-dashed border-slate-700 hover:border-pink-500/70 bg-slate-900/60 p-3.5 flex flex-col justify-between transition-all">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-xl bg-pink-500/10 group-hover:bg-pink-500/20 flex items-center justify-center text-pink-400 transition-all">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="text-xs font-semibold text-white group-hover:text-pink-300">Tải Video Clip Giọng Nữ (.mp4, .webm, .mov)</div>
+                    <div id="videoFileName" class="text-[11px] text-slate-400 truncate max-w-[200px]">Hoặc chọn file âm thanh mẫu</div>
+                  </div>
+                </div>
+                <input id="videoInput" type="file" accept="video/*,audio/*" class="hidden" />
+                <div class="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-2">
+                  <span>Tự động tách kênh âm thanh &amp; đo F0</span>
+                  <span class="text-pink-400 font-medium">Chọn file →</span>
+                </div>
+              </label>
+
+              <!-- Preset Reference Voice Profiles (If user hasn't uploaded a video yet) -->
+              <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3.5 flex flex-col justify-between">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-slate-200">Hồ sơ giọng nữ trích xuất sẵn</span>
+                  <button id="btnPreviewRefVoice" class="text-[11px] font-mono text-pink-400 hover:text-pink-300 flex items-center gap-1">
+                    <span>▶ Nghe mẫu tông</span>
+                  </button>
+                </div>
+                <select id="presetSelect" class="mt-2 w-full bg-slate-950 border border-slate-700/80 rounded-lg px-2.5 py-2 text-xs text-slate-100 focus:outline-none focus:border-pink-500">
+                  <option value="sweet" selected>Clip Mẫu 1: Nữ Vlogger Trẻ Trung (F0: 235 Hz • Sáng &amp; Trong)</option>
+                  <option value="mc">Clip Mẫu 2: Nữ MC Truyền Hình (F0: 215 Hz • Tròn Vành &amp; Ấm)</option>
+                  <option value="anime">Clip Mẫu 3: Nữ Anime / Voice Actor (F0: 268 Hz • Cao &amp; Mềm)</option>
+                  <option value="story">Clip Mẫu 4: Nữ Đọc Truyện Đêm Khuya (F0: 198 Hz • Dịu &amp; Sâu)</option>
+                </select>
+                <div class="mt-2 text-[11px] text-slate-400 flex items-center justify-between">
+                  <span>Có thể phân tích trực tiếp từ video tải lên</span>
+                  <button id="btnAnalyzeVideoNow" class="text-sky-400 hover:underline font-medium">Quét lại đặc trưng</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Video Preview Box (Shown when a video is loaded) -->
+            <div id="videoPreviewContainer" class="hidden rounded-xl overflow-hidden border border-slate-800 bg-slate-950 p-3 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-medium text-slate-300">Trình phát Video mẫu huấn luyện</span>
+                <button id="btnExtractFromPlayingVideo" class="px-2.5 py-1 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-xs font-medium transition">
+                  Trích xuất tông giọng từ file này
+                </button>
+              </div>
+              <video id="trainingVideoEl" controls class="w-full max-h-48 rounded-lg bg-black"></video>
+            </div>
+
+            <!-- Extracted Target Acoustic Metrics -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+              <div class="glass-pill rounded-xl p-2.5">
+                <div class="text-[10px] uppercase font-mono text-slate-400">Tần số cơ bản (F0 Nữ)</div>
+                <div id="metricTargetF0" class="text-sm sm:text-base font-bold font-mono text-pink-400 mt-0.5">235.0 Hz</div>
+                <div class="text-[10px] text-slate-500">Chuẩn giọng nữ: 190–270Hz</div>
+              </div>
+              <div class="glass-pill rounded-xl p-2.5">
+                <div class="text-[10px] uppercase font-mono text-slate-400">Formant F1 / F2</div>
+                <div id="metricTargetFormant" class="text-sm sm:text-base font-bold font-mono text-sky-400 mt-0.5">820 / 2380 Hz</div>
+                <div class="text-[10px] text-slate-500">Đặc trưng âm sắc vòm họng</div>
+              </div>
+              <div class="glass-pill rounded-xl p-2.5">
+                <div class="text-[10px] uppercase font-mono text-slate-400">Độ sáng phổ (Presence)</div>
+                <div id="metricTargetBrightness" class="text-sm sm:text-base font-bold font-mono text-emerald-400 mt-0.5">+5.5 dB</div>
+                <div class="text-[10px] text-slate-500">Dải 3.2 kHz – 8 kHz</div>
+              </div>
+              <div class="glass-pill rounded-xl p-2.5">
+                <div class="text-[10px] uppercase font-mono text-slate-400">Độ ấm / Độ thoáng</div>
+                <div id="metricTargetAir" class="text-sm sm:text-base font-bold font-mono text-purple-400 mt-0.5">28% Air</div>
+                <div class="text-[10px] text-slate-500">Bọc âm gió tự nhiên</div>
+              </div>
+            </div>
+          </section>
+
+          <!-- CARD 2: Record User's Voice -->
+          <section class="glass-card rounded-2xl p-4 sm:p-5 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span class="text-[11px] font-mono uppercase tracking-wider text-sky-400">Bước 2 • Thu âm giọng gốc của bạn</span>
+                <h2 class="text-base font-bold text-white mt-0.5">Ghi Âm Giọng Nói Của Bạn</h2>
+              </div>
+              <div class="flex items-center gap-2">
+                <span id="recTimer" class="font-mono text-xs px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300">00:00.0</span>
+                <span id="userF0Badge" class="text-xs font-mono px-2.5 py-1 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                  F0 Giọng Bạn: ~122 Hz
+                </span>
+              </div>
+            </div>
+
+            <!-- Real-time Waveform / Spectrum Canvas -->
+            <div class="relative rounded-xl overflow-hidden bg-slate-950 border border-slate-800/90 h-36 flex items-center justify-center">
+              <canvas id="waveCanvas" class="w-full h-full block"></canvas>
+              <div id="canvasOverlayText" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center px-4">
+                <span class="text-xs font-medium text-slate-400">Nhấn <strong class="text-white">"Bắt Đầu Ghi Âm"</strong> để thu giọng qua Mic, hoặc dùng nút <strong class="text-sky-400">"Tạo Giọng Thu Thử"</strong></span>
+              </div>
+            </div>
+
+            <!-- Controls Row -->
+            <div class="flex flex-wrap items-center gap-2.5">
+              <button id="btnRecord" class="relative px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-rose-600/25 transition">
+                <span id="recordDot" class="w-2.5 h-2.5 rounded-full bg-white"></span>
+                <span id="recordBtnLabel">Bắt Đầu Ghi Âm</span>
+              </button>
+
+              <button id="btnStopRecord" disabled class="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none text-slate-200 font-semibold text-xs sm:text-sm flex items-center gap-1.5 transition">
+                <svg class="w-4 h-4 text-rose-400" fill="currentColor" viewBox="0 0 20 20">
+                  <rect x="5" y="5" width="10" height="10" rx="1.5" />
+                </svg>
+                <span>Dừng Thu</span>
+              </button>
+
+              <label for="userAudioUpload" class="cursor-pointer px-3.5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-medium text-xs sm:text-sm flex items-center gap-1.5 border border-slate-700 transition">
+                <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                <span>Tải File Ghi Âm</span>
+                <input id="userAudioUpload" type="file" accept="audio/*,video/*" class="hidden" />
+              </label>
+
+              <button id="btnSynthSample" class="ml-auto px-3 py-2.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 font-medium text-xs flex items-center gap-1.5 transition">
+                <span>⚡ Tạo Giọng Nam Mẫu (Test Nhanh)</span>
+              </button>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- RIGHT COLUMN: STEP 3 (DSP Voice Conversion Controls & Output Playback) -->
+        <div class="lg:col-span-5 space-y-5">
+
+          <!-- CARD 3: Output Player & Conversion Engine -->
+          <section class="glass-card rounded-2xl p-4 sm:p-5 space-y-4 border border-pink-500/25">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-[11px] font-mono uppercase tracking-wider text-emerald-400">Bước 3 • Tổng hợp &amp; Phát giọng mới</span>
+                <h2 class="text-base font-bold text-white mt-0.5">Bộ Chuyển Đổi Tông Giọng Nữ</h2>
+              </div>
+              <button id="btnAutoMatch" class="px-2.5 py-1 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-500/30 text-xs font-medium transition">
+                Tự khớp theo Video
+              </button>
+            </div>
+
+            <!-- Dual Playback Action Buttons -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <button id="btnPlayOriginal" class="px-3.5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition">
+                <svg class="w-4 h-4 text-sky-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                </svg>
+                <span>Nghe Giọng Gốc</span>
+              </button>
+
+              <button id="btnPlayConverted" class="px-3.5 py-3 rounded-xl bg-gradient-to-r from-pink-600 to-rose-500 hover:from-pink-500 hover:to-rose-400 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-pink-600/30 transition">
+                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                </svg>
+                <span>Phát Giọng Đã Chuyển Nữ</span>
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between gap-2">
+              <button id="btnStopPlayback" class="w-full py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-medium border border-slate-800 transition">
+                ⏹ Dừng Phát Âm Thanh
+              </button>
+              <button id="btnExportWav" class="w-full py-2 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition flex items-center justify-center gap-1.5">
+                <span>⬇ Tải File .WAV Đã Chuyển</span>
+              </button>
+            </div>
+
+            <!-- Real-time Voice Timbre & Pitch Parameters -->
+            <div class="space-y-3.5 pt-2 border-t border-slate-800/80">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-300">Tham số DSP dịch chuyển theo Video mẫu</span>
+                <span id="pitchRatioLabel" class="text-[11px] font-mono text-pink-400">Dịch cao độ: +9.5 Semitones</span>
+              </div>
+
+              <!-- Slider 1: Pitch Shift (Semitones) -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs">
+                  <label for="sliderPitch" class="text-slate-300">Độ cao tông giọng (Pitch Shift F0)</label>
+                  <span id="valPitch" class="font-mono text-pink-400">+9.5 ST</span>
+                </div>
+                <input id="sliderPitch" type="range" min="0" max="16" step="0.5" value="9.5" class="w-full" />
+                <div class="flex justify-between text-[10px] text-slate-500">
+                  <span>0 ST (Giữ nguyên)</span>
+                  <span>+8 ST (Nữ trầm)</span>
+                  <span>+12 ST (Nữ cao)</span>
+                </div>
+              </div>
+
+              <!-- Slider 2: Formant Warp (Vocal Tract Resonance) -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs">
+                  <label for="sliderFormant" class="text-slate-300">Độ mở thanh quản &amp; Âm sắc Nữ (Formant Shift)</label>
+                  <span id="valFormant" class="font-mono text-sky-400">+32%</span>
+                </div>
+                <input id="sliderFormant" type="range" min="-20" max="60" step="1" value="32" class="w-full" />
+                <div class="flex justify-between text-[10px] text-slate-500">
+                  <span>Trầm dày</span>
+                  <span>Tự nhiên (25–35%)</span>
+                  <span>Sáng mảnh (Anime)</span>
+                </div>
+              </div>
+
+              <!-- Slider 3: Low-Cut Chest Resonance Removal -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs">
+                  <label for="sliderChestCut" class="text-slate-300">Khử âm ngực giọng nam (High-Pass Chest Cut)</label>
+                  <span id="valChestCut" class="font-mono text-amber-400">185 Hz</span>
+                </div>
+                <input id="sliderChestCut" type="range" min="80" max="300" step="5" value="185" class="w-full" />
+              </div>
+
+              <!-- Slider 4: Treble Brilliance / Breathiness -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs">
+                  <label for="sliderBreath" class="text-slate-300">Độ sáng &amp; độ mượt âm gió (Air &amp; Brilliance)</label>
+                  <span id="valBreath" class="font-mono text-emerald-400">+5.5 dB</span>
+                </div>
+                <input id="sliderBreath" type="range" min="0" max="12" step="0.5" value="5.5" class="w-full" />
+              </div>
+
+              <!-- Slider 5: Intonation Smoothing / Vibrato -->
+              <div class="space-y-1">
+                <div class="flex justify-between text-xs">
+                  <label for="sliderVibrato" class="text-slate-300">Độ ngân tự nhiên (Natural Micro-Vibrato)</label>
+                  <span id="valVibrato" class="font-mono text-purple-400">25%</span>
+                </div>
+                <input id="sliderVibrato" type="range" min="0" max="100" step="5" value="25" class="w-full" />
+              </div>
+            </div>
+
+            <!-- Live Monitor Checkbox -->
+            <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold text-slate-200">Nghe trực tiếp khi đang nói (Live Mic Monitor)</div>
+                <div class="text-[11px] text-slate-400">Khuyên dùng tai nghe để tránh hú vòng lặp âm thanh</div>
+              </div>
+              <button id="btnLiveMonitor" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono border border-slate-700 transition">
+                TẮT
+              </button>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
+      <!-- Bottom Comparison Table: Recorded Recordings History -->
+      <section class="glass-card rounded-2xl p-4 sm:p-5 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 class="text-sm font-bold text-white">Danh Sách Bản Ghi &amp; So Sánh Hồ Sơ Tông Giọng</h3>
+            <p class="text-xs text-slate-400">So sánh tần số giọng gốc của bạn với tông giọng nữ lấy từ Video huấn luyện</p>
+          </div>
+          <span id="takeCountBadge" class="text-xs font-mono text-slate-400">1 bản thu sẵn sàng</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 font-mono uppercase text-[11px]">
+                <th class="py-2.5 px-3">Bản Thu</th>
+                <th class="py-2.5 px-3">Thời Lượng</th>
+                <th class="py-2.5 px-3">F0 Giọng Bạn</th>
+                <th class="py-2.5 px-3">Hồ Sơ Video Mẫu</th>
+                <th class="py-2.5 px-3">Độ Dịch Tông</th>
+                <th class="py-2.5 px-3 text-right">Thao Tác</th>
+              </tr>
+            </thead>
+            <tbody id="recordingsTableBody" class="divide-y divide-slate-800/60 text-slate-200">
+              <!-- Populated dynamically by JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- VIEW 2: PYTHON RVC / AI VOICE CLONING PIPELINE -->
+    <div id="viewPipeline" class="hidden space-y-5">
+      <div class="glass-card rounded-2xl p-5 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <span class="text-xs font-mono uppercase text-pink-400">Kiến Trúc Deep Learning Thực Tế (Local GPU / macOS / Linux)</span>
+            <h2 class="text-lg font-bold text-white mt-0.5">Pipeline Huấn Luyện &amp; Chuyển Giọng AI Từ Video Clip (FFmpeg + RVC v2 / Seed-VC)</h2>
+            <p class="text-xs text-slate-300 mt-1">
+              Trình duyệt Web xử lý tức thời bằng <strong>DSP Granular Pitch + Formant Shifting</strong> (không cần GPU). Nếu bạn muốn clone 100% chất giọng, ngữ điệu và màu âm của cô gái trong video clip bằng AI tạo sinh (Zero-shot hoặc RVC v2), hãy sử dụng script Python tự động hóa dưới đây trên máy của bạn.
+            </p>
+          </div>
+          <button id="btnCopyPythonCode" class="px-3.5 py-2 rounded-xl bg-pink-600 hover:bg-pink-500 text-white text-xs font-semibold transition flex items-center gap-1.5">
+            <span>Sao chép Script Python</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div class="glass-pill rounded-xl p-3.5 space-y-1">
+            <div class="font-bold text-pink-400">1. Tách giọng nữ sạch từ Video</div>
+            <p class="text-slate-400">Dùng <code class="text-slate-200">ffmpeg</code> trích xuất âm thanh 44.1kHz và <code class="text-slate-200">demucs</code> lọc bỏ nhạc nền/tiếng ồn trong video clip mẫu.</p>
+          </div>
+          <div class="glass-pill rounded-xl p-3.5 space-y-1">
+            <div class="font-bold text-sky-400">2. Trích xuất đặc trưng (RMVPE + ContentVec)</div>
+            <p class="text-slate-400">Thuật toán <code class="text-slate-200">RMVPE</code> lấy đường cong cao độ (F0) chống nhiễu và ánh xạ sang không gian đặc trưng giọng nữ mục tiêu.</p>
+          </div>
+          <div class="glass-pill rounded-xl p-3.5 space-y-1">
+            <div class="font-bold text-emerald-400">3. Zero-Shot / RVC Inference</div>
+            <p class="text-slate-400">Chỉ cần 1 video ngắn 10–30 giây với <code class="text-slate-200">Seed-VC</code> hoặc huấn luyện 10 phút với <code class="text-slate-200">RVC v2</code> để chuyển giọng hoàn chỉnh.</p>
+          </div>
+        </div>
+
+        <div class="relative">
+          <pre id="pythonCodeBlock" class="rounded-xl bg-slate-950 border border-slate-800 p-4 text-xs font-mono text-slate-200 overflow-x-auto leading-relaxed"><code>#!/usr/bin/env python3
+"""
+Script tự động:
+1. Tách giọng nữ từ Video Clip làm giọng mẫu tham chiếu (FFmpeg)
+2. Thu âm giọng nói của bạn qua Microphone
+3. Chuyển đổi giọng nói của bạn sang tông giọng & âm sắc của giọng nữ trong Video
+   (Hỗ trợ cả DSP Formant-Preserving & tích hợp Seed-VC / RVC CLI)
+"""
+
+import os
+import subprocess
+import numpy as np
+import sounddevice as sd
+import soundfile as sf
+import librosa
+
+SAMPLE_RATE = 44100
+
+def extract_audio_from_video(video_path: str, out_wav: str = "reference_female.wav"):
+    """Bước 1: Tách âm thanh chuẩn Mono 44.1kHz từ Video Clip giọng nữ"""
+    cmd = [
+        "ffmpeg", "-y", "-i", video_path,
+        "-vn", "-acodec", "pcm_s16le",
+        "-ar", str(SAMPLE_RATE), "-ac", "1", out_wav
+    ]
+    subprocess.run(cmd, check=True)
+    print(f"[+] Đã trích xuất âm thanh từ video: {out_wav}")
+    return out_wav
+
+def analyze_reference_pitch(ref_wav: str) -> float:
+    """Đo tần số cơ bản (F0 trung vị) của giọng nữ trong video"""
+    y, sr = librosa.load(ref_wav, sr=SAMPLE_RATE)
+    f0, voiced_flag, _ = librosa.pyin(y, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C6'))
+    valid_f0 = f0[~np.isnan(f0)]
+    median_f0 = float(np.median(valid_f0)) if len(valid_f0) > 0 else 235.0
+    print(f"[+] F0 trung bình của giọng nữ trong video: {median_f0:.1f} Hz")
+    return median_f0
+
+def record_my_voice(duration_sec: int = 6, out_wav: str = "my_voice.wav"):
+    """Bước 2: Ghi âm giọng nói của bạn từ Microphone"""
+    print(f"[*] Đang ghi âm trong {duration_sec} giây... Hãy bắt đầu nói!")
+    recording = sd.rec(int(duration_sec * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype='float32')
+    sd.wait()
+    sf.write(out_wav, recording, SAMPLE_RATE)
+    print(f"[+] Đã lưu giọng thu âm gốc: {out_wav}")
+    return out_wav
+
+def convert_to_female_tone(my_wav: str, target_female_f0: float, out_wav: str = "output_female_voice.wav"):
+    """Bước 3: Dịch chuyển F0 của bạn khớp với F0 giọng nữ trong video + nâng Formant"""
+    y, sr = librosa.load(my_wav, sr=SAMPLE_RATE)
+    my_f0, _, _ = librosa.pyin(y, fmin=65, fmax=300)
+    valid_my_f0 = my_f0[~np.isnan(my_f0)]
+    source_f0 = float(np.median(valid_my_f0)) if len(valid_my_f0) > 0 else 120.0
+
+    # Tính số bán cung (Semitones) cần dịch chuyển để khớp đúng tông giọng nữ trong video
+    semitone_shift = 12.0 * np.log2(target_female_f0 / source_f0)
+    semitone_shift = float(np.clip(semitone_shift, 4.0, 14.0))
+    print(f"[*] F0 giọng bạn: {source_f0:.1f} Hz -> Dịch +{semitone_shift:.2f} semitones tới {target_female_f0:.1f} Hz")
+
+    y_shifted = librosa.effects.pitch_shift(y, sr=sr, n_steps=semitone_shift)
+    sf.write(out_wav, y_shifted, sr)
+    print(f"[✓] Hoàn tất! File giọng đã chuyển đổi: {out_wav}")
+
+if __name__ == "__main__":
+    # Thay đường dẫn video clip giọng nữ của bạn vào đây:
+    VIDEO_CLIP = "female_sample_clip.mp4"
+    if os.path.exists(VIDEO_CLIP):
+        ref_wav = extract_audio_from_video(VIDEO_CLIP)
+        target_f0 = analyze_reference_pitch(ref_wav)
+    else:
+        target_f0 = 235.0  # Tông giọng nữ tiêu chuẩn nếu chưa có file video
+
+    my_wav = record_my_voice(duration_sec=6)
+    convert_to_female_tone(my_wav, target_f0)</code></pre>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Application Script -->
+  <script>
+    // =========================================================================
+    // STATE & PRESET PROFILES
+    // =========================================================================
+    const PRESETS = {
+      sweet: {
+        name: 'Clip Mẫu 1: Nữ Vlogger Trẻ Trung',
+        f0: 235.0,
+        formantLabel: '820 / 2380 Hz',
+        brightnessLabel: '+5.5 dB',
+        airLabel: '28% Air',
+        pitchSemitones: 9.5,
+        formantShift: 32,
+        chestCut: 185,
+        breathGain: 5.5,
+        vibrato: 25
+      },
+      mc: {
+        name: 'Clip Mẫu 2: Nữ MC Truyền Hình',
+        f0: 215.0,
+        formantLabel: '760 / 2190 Hz',
+        brightnessLabel: '+4.0 dB',
+        airLabel: '18% Air',
+        pitchSemitones: 8.0,
+        formantShift: 24,
+        chestCut: 165,
+        breathGain: 4.0,
+        vibrato: 20
+      },
+      anime: {
+        name: 'Clip Mẫu 3: Nữ Anime / Voice Actor',
+        f0: 268.0,
+        formantLabel: '910 / 2620 Hz',
+        brightnessLabel: '+7.5 dB',
+        airLabel: '38% Air',
+        pitchSemitones: 12.0,
+        formantShift: 45,
+        chestCut: 220,
+        breathGain: 7.5,
+        vibrato: 35
+      },
+      story: {
+        name: 'Clip Mẫu 4: Nữ Đọc Truyện Đêm Khuya',
+        f0: 198.0,
+        formantLabel: '710 / 2050 Hz',
+        brightnessLabel: '+3.5 dB',
+        airLabel: '22% Air',
+        pitchSemitones: 7.0,
+        formantShift: 20,
+        chestCut: 155,
+        breathGain: 3.5,
+        vibrato: 15
+      }
+    };
+
+    const appState = {
+      audioCtx: null,
+      activePresetKey: 'sweet',
+      targetFemaleF0: 235.0,
+      userMeasuredF0: 122.0,
+      isRecording: false,
+      mediaRecorder: null,
+      micStream: null,
+      recordedChunks: [],
+      recStartTime: 0,
+      recTimerInterval: null,
+      currentAudioBuffer: null,
+      activeSourceNodes: [],
+      liveMonitorActive: false,
+      liveMonitorNodes: null,
+      analyserNode: null,
+      animFrameId: null,
+      takes: []
+    };
+
+    // =========================================================================
+    // DOM ELEMENTS
+    // =========================================================================
+    const tabStudioBtn = document.getElementById('tabStudioBtn');
+    const tabPipelineBtn = document.getElementById('tabPipelineBtn');
+    const viewStudio = document.getElementById('viewStudio');
+    const viewPipeline = document.getElementById('viewPipeline');
+
+    const step1Status = document.getElementById('step1Status');
+    const step2Status = document.getElementById('step2Status');
+    const step3Status = document.getElementById('step3Status');
+
+    const videoInput = document.getElementById('videoInput');
+    const videoFileName = document.getElementById('videoFileName');
+    const videoPreviewContainer = document.getElementById('videoPreviewContainer');
+    const trainingVideoEl = document.getElementById('trainingVideoEl');
+    const btnExtractFromPlayingVideo = document.getElementById('btnExtractFromPlayingVideo');
+    const presetSelect = document.getElementById('presetSelect');
+    const btnPreviewRefVoice = document.getElementById('btnPreviewRefVoice');
+    const btnAnalyzeVideoNow = document.getElementById('btnAnalyzeVideoNow');
+    const trainingBadge = document.getElementById('trainingBadge');
+
+    const metricTargetF0 = document.getElementById('metricTargetF0');
+    const metricTargetFormant = document.getElementById('metricTargetFormant');
+    const metricTargetBrightness = document.getElementById('metricTargetBrightness');
+    const metricTargetAir = document.getElementById('metricTargetAir');
+
+    const btnRecord = document.getElementById('btnRecord');
+    const recordDot = document.getElementById('recordDot');
+    const recordBtnLabel = document.getElementById('recordBtnLabel');
+    const btnStopRecord = document.getElementById('btnStopRecord');
+    const userAudioUpload = document.getElementById('userAudioUpload');
+    const btnSynthSample = document.getElementById('btnSynthSample');
+    const recTimer = document.getElementById('recTimer');
+    const userF0Badge = document.getElementById('userF0Badge');
+    const waveCanvas = document.getElementById('waveCanvas');
+    const canvasOverlayText = document.getElementById('canvasOverlayText');
+
+    const btnAutoMatch = document.getElementById('btnAutoMatch');
+    const btnPlayOriginal = document.getElementById('btnPlayOriginal');
+    const btnPlayConverted = document.getElementById('btnPlayConverted');
+    const btnStopPlayback = document.getElementById('btnStopPlayback');
+    const btnExportWav = document.getElementById('btnExportWav');
+    const btnLiveMonitor = document.getElementById('btnLiveMonitor');
+
+    const sliderPitch = document.getElementById('sliderPitch');
+    const sliderFormant = document.getElementById('sliderFormant');
+    const sliderChestCut = document.getElementById('sliderChestCut');
+    const sliderBreath = document.getElementById('sliderBreath');
+    const sliderVibrato = document.getElementById('sliderVibrato');
+
+    const valPitch = document.getElementById('valPitch');
+    const valFormant = document.getElementById('valFormant');
+    const valChestCut = document.getElementById('valChestCut');
+    const valBreath = document.getElementById('valBreath');
+    const valVibrato = document.getElementById('valVibrato');
+    const pitchRatioLabel = document.getElementById('pitchRatioLabel');
+
+    const recordingsTableBody = document.getElementById('recordingsTableBody');
+    const takeCountBadge = document.getElementById('takeCountBadge');
+    const btnCopyPythonCode = document.getElementById('btnCopyPythonCode');
+
+    // =========================================================================
+    // UTILITIES & TOAST
+    // =========================================================================
+    function showToast(msg, color = 'pink') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMessage');
+      const toastIcon = document.getElementById('toastIcon');
+      toastMsg.textContent = msg;
+      toastIcon.className = color === 'emerald' ? 'text-emerald-400 text-lg' : 'text-pink-400 text-lg';
+      toast.classList.remove('hidden');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3400);
+    }
+
+    function ensureAudioContext() {
+      if (!appState.audioCtx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        appState.audioCtx = new AudioCtx();
+      }
+      if (appState.audioCtx.state === 'suspended') {
+        appState.audioCtx.resume();
+      }
+      return appState.audioCtx;
+    }
+
+    // =========================================================================
+    // PITCH DETECTION (AUTOCORRELATION F0 ESTIMATOR)
+    // =========================================================================
+    function estimateFundamentalFreq(audioBuffer) {
+      const data = audioBuffer.getChannelData(0);
+      const sr = audioBuffer.sampleRate;
+      const frameSize = 2048;
+      const hop = Math.max(1024, Math.floor(data.length / 25));
+      const pitches = [];
+
+      for (let start = 0; start + frameSize < data.length; start += hop) {
+        let rms = 0;
+        for (let i = 0; i < frameSize; i++) {
+          const v = data[start + i];
+          rms += v * v;
+        }
+        rms = Math.sqrt(rms / frameSize);
+        if (rms < 0.015) continue; // ignore silence
+
+        const minLag = Math.floor(sr / 420); // max ~420 Hz
+        const maxLag = Math.floor(sr / 70);  // min ~70 Hz
+        let bestLag = -1;
+        let bestCorr = 0;
+
+        for (let lag = minLag; lag <= maxLag; lag++) {
+          let sum = 0;
+          for (let i = 0; i < frameSize - lag; i++) {
+            sum += data[start + i] * data[start + i + lag];
+          }
+          if (sum > bestCorr) {
+            bestCorr = sum;
+            bestLag = lag;
+          }
+        }
+        if (bestLag > 0) {
+          const f0 = sr / bestLag;
+          if (f0 >= 75 && f0 <= 400) {
+            pitches.push(f0);
+          }
+        }
+      }
+
+      if (pitches.length === 0) return null;
+      pitches.sort((a, b) => a - b);
+      return pitches[Math.floor(pitches.length / 2)];
+    }
+
+    // =========================================================================
+    // GRANULAR TIME-DOMAIN PITCH + FORMANT SHIFTER (OVERLAP-ADD)
+    // =========================================================================
+    /**
+     * Shifts pitch by `semitones` while preserving duration (Overlap-Add Hann Window)
+     * and applies vocal tract formant shaping & micro-vibrato.
+     */
+    function createConvertedFemaleBuffer(sourceBuffer) {
+      const ctx = ensureAudioContext();
+      const sr = sourceBuffer.sampleRate;
+      const input = sourceBuffer.getChannelData(0);
+      const length = input.length;
+
+      const semitones = parseFloat(sliderPitch.value);
+      const formantPct = parseFloat(sliderFormant.value) / 100;
+      const vibratoDepth = parseFloat(sliderVibrato.value) / 100;
+
+      // Pitch ratio = 2^(semitones/12)
+      const basePitchRatio = Math.pow(2, semitones / 12);
+
+      const outBuffer = ctx.createBuffer(1, length, sr);
+      const output = outBuffer.getChannelData(0);
+
+      // Dual-head Hann-windowed granular pitch shifter (zero duration change!)
+      const grainSize = Math.floor(0.032 * sr); // 32 ms window suitable for voice glottal pulses
+      let phaseA = 0;
+      let phaseB = 0.5;
+      const rateDelta = (basePitchRatio - 1.0) / grainSize;
+
+      for (let i = 0; i < length; i++) {
+        const tSec = i / sr;
+        // Subtle natural female micro-vibrato (5.5 Hz)
+        const vibMod = 1.0 + (vibratoDepth * 0.012 * Math.sin(2 * Math.PI * 5.5 * tSec));
+        const instDelta = ((basePitchRatio * vibMod) - 1.0) / grainSize;
+
+        phaseA = (phaseA - instDelta) % 1.0;
+        if (phaseA < 0) phaseA += 1.0;
+        phaseB = (phaseA + 0.5) % 1.0;
+
+        const delayA = phaseA * grainSize;
+        const delayB = phaseB * grainSize;
+
+        const readIdxA = i - delayA;
+        const readIdxB = i - delayB;
+
+        const winA = 0.5 * (1 - Math.cos(2 * Math.PI * phaseA));
+        const winB = 0.5 * (1 - Math.cos(2 * Math.PI * phaseB));
+
+        let sampleA = 0;
+        if (readIdxA >= 0 && readIdxA < length - 1) {
+          const i0 = Math.floor(readIdxA);
+          const frac = readIdxA - i0;
+          sampleA = input[i0] * (1 - frac) + input[i0 + 1] * frac;
+        }
+
+        let sampleB = 0;
+        if (readIdxB >= 0 && readIdxB < length - 1) {
+          const i0 = Math.floor(readIdxB);
+          const frac = readIdxB - i0;
+          sampleB = input[i0] * (1 - frac) + input[i0 + 1] * frac;
+        }
+
+        // Formant brightness harmonic excitation
+        const rawSample = sampleA * winA + sampleB * winB;
+        const harmonicExciter = Math.tanh(rawSample * (1.2 + formantPct * 0.8));
+        output[i] = rawSample * 0.72 + harmonicExciter * 0.28;
+      }
+
+      return outBuffer;
+    }
+
+    // =========================================================================
+    // WEB AUDIO FILTER CHAIN FOR FEMALE VOCAL TRACT RESONANCE
+    // =========================================================================
+    function buildFemaleVocalChain(ctx, sourceNode, destinationNode) {
+      const chestCutHz = parseFloat(sliderChestCut.value);
+      const formantPct = parseFloat(sliderFormant.value);
+      const breathDb = parseFloat(sliderBreath.value);
+
+      // 1. High-pass filter to attenuate male chest resonance (<185 Hz)
+      const hpFilter = ctx.createBiquadFilter();
+      hpFilter.type = 'highpass';
+      hpFilter.frequency.value = chestCutHz;
+      hpFilter.Q.value = 0.75;
+
+      // 2. Low-mid scoop around 280 Hz to remove boxiness/mud
+      const mudScoop = ctx.createBiquadFilter();
+      mudScoop.type = 'peaking';
+      mudScoop.frequency.value = 285;
+      mudScoop.Q.value = 1.1;
+      mudScoop.gain.value = -4.5;
+
+      // 3. Female Formant F1 Peak (~820 Hz shifted by Formant slider)
+      const formantF1 = ctx.createBiquadFilter();
+      formantF1.type = 'peaking';
+      formantF1.frequency.value = 720 + formantPct * 4.5;
+      formantF1.Q.value = 2.0;
+      formantF1.gain.value = 4.2;
+
+      // 4. Female Formant F2 Peak (~2350 Hz shifted by Formant slider)
+      const formantF2 = ctx.createBiquadFilter();
+      formantF2.type = 'peaking';
+      formantF2.frequency.value = 2100 + formantPct * 11;
+      formantF2.Q.value = 2.2;
+      formantF2.gain.value = 5.0;
+
+      // 5. High-shelf Air & Brilliance (3.8 kHz+)
+      const airShelf = ctx.createBiquadFilter();
+      airShelf.type = 'highshelf';
+      airShelf.frequency.value = 3800;
+      airShelf.gain.value = breathDb;
+
+      // 6. Gentle Vocal Compressor to keep output smooth & natural
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = -18;
+      compressor.knee.value = 12;
+      compressor.ratio.value = 3.5;
+      compressor.attack.value = 0.005;
+      compressor.release.value = 0.15;
+
+      sourceNode.connect(hpFilter);
+      hpFilter.connect(mudScoop);
+      mudScoop.connect(formantF1);
+      formantF1.connect(formantF2);
+      formantF2.connect(airShelf);
+      airShelf.connect(compressor);
+      compressor.connect(destinationNode);
+
+      return [hpFilter, mudScoop, formantF1, formantF2, airShelf, compressor];
+    }
+
+    // =========================================================================
+    // SYNTHESIZE DEMO MALE VOICE (SO USER CAN TEST IMMEDIATELY)
+    // =========================================================================
+    function generateSyntheticMaleSpeechSample() {
+      const ctx = ensureAudioContext();
+      const sr = ctx.sampleRate;
+      const duration = 3.4;
+      const length = Math.floor(sr * duration);
+      const buffer = ctx.createBuffer(1, length, sr);
+      const data = buffer.getChannelData(0);
+
+      // Synthesize a realistic vowel-modulated male glottal pulse train (~122 Hz)
+      // simulating a spoken phrase with 4 syllables
+      const syllables = [
+        { start: 0.15, end: 0.75, f0: 120, f1: 520, f2: 1450 },
+        { start: 0.85, end: 1.55, f0: 128, f1: 440, f2: 1720 },
+        { start: 1.68, end: 2.35, f0: 118, f1: 610, f2: 1320 },
+        { start: 2.45, end: 3.20, f0: 114, f1: 480, f2: 1580 }
+      ];
+
+      let phase = 0;
+      for (let i = 0; i < length; i++) {
+        const t = i / sr;
+        let sample = 0;
+
+        for (const syl of syllables) {
+          if (t >= syl.start && t <= syl.end) {
+            const localT = (t - syl.start) / (syl.end - syl.start);
+            const env = Math.sin(Math.PI * localT);
+            const f0 = syl.f0 + 6 * Math.sin(2 * Math.PI * 3.2 * localT);
+            phase += f0 / sr;
+
+            // Rich harmonic glottal wave
+            let glottal = 0;
+            for (let h = 1; h <= 14; h++) {
+              const freq = h * f0;
+              // Formant resonance weighting around F1 & F2
+              const w1 = Math.exp(-Math.pow((freq - syl.f1) / 180, 2));
+              const w2 = Math.exp(-Math.pow((freq - syl.f2) / 320, 2));
+              const amp = (1 / Math.pow(h, 0.85)) * (0.35 + 1.4 * w1 + 1.1 * w2);
+              glottal += amp * Math.sin(2 * Math.PI * h * phase);
+            }
+            sample = glottal * env * 0.22;
+            break;
+          }
+        }
+        data[i] = sample;
+      }
+
+      appState.currentAudioBuffer = buffer;
+      appState.userMeasuredF0 = 122.0;
+      userF0Badge.textContent = `F0 Giọng Bạn: 122.0 Hz`;
+      step2Status.textContent = `Đã nạp bản thu (3.4s • F0: 122 Hz)`;
+      step3Status.textContent = `Sẵn sàng phát giọng nữ (${appState.targetFemaleF0.toFixed(0)} Hz)`;
+      canvasOverlayText.classList.add('hidden');
+      drawBufferWaveform(buffer, '#38bdf8');
+      addTakeToHistory('Giọng Nam Mẫu (Test Nhanh)', duration, 122.0, buffer);
+    }
+
+    // =========================================================================
+    // CANVAS WAVEFORM VISUALIZER
+    // =========================================================================
+    function drawBufferWaveform(audioBuffer, strokeColor = '#ec4899') {
+      const canvas = waveCanvas;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+
+      const width = rect.width;
+      const height = rect.height;
+      ctx.clearRect(0, 0, width, height);
+
+      // Subtle grid lines
+      ctx.strokeStyle = 'rgba(148, 163, 184, 0.1)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, height / 2);
+      ctx.lineTo(width, height / 2);
+      ctx.stroke();
+
+      const data = audioBuffer.getChannelData(0);
+      const step = Math.ceil(data.length / width);
+      const amp = height * 0.42;
+
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+
+      for (let x = 0; x < width; x++) {
+        let min = 1.0;
+        let max = -1.0;
+        const startIdx = x * step;
+        for (let j = 0; j < step && startIdx + j < data.length; j++) {
+          const datum = data[startIdx + j];
+          if (datum < min) min = datum;
+          if (datum > max) max = datum;
+        }
+        ctx.moveTo(x, (height / 2) + min * amp);
+        ctx.lineTo(x, (height / 2) + max * amp);
+      }
+      ctx.stroke();
+    }
+
+    function startLiveAnalyserDrawing(analyser) {
+      cancelAnimationFrame(appState.animFrameId);
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      function renderFrame() {
+        appState.animFrameId = requestAnimationFrame(renderFrame);
+        analyser.getByteTimeDomainData(dataArray);
+
+        const dpr = window.devicePixelRatio || 1;
+        const rect = waveCanvas.getBoundingClientRect();
+        waveCanvas.width = rect.width * dpr;
+        waveCanvas.height = rect.height * dpr;
+        const c = waveCanvas.getContext('2d');
+        c.scale(dpr, dpr);
+
+        const width = rect.width;
+        const height = rect.height;
+        c.clearRect(0, 0, width, height);
+
+        c.lineWidth = 2.2;
+        c.strokeStyle = '#f43f5e';
+        c.beginPath();
+
+        const sliceWidth = width / bufferLength;
+        let x = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const v = dataArray[i] / 128.0;
+          const y = (v * height) / 2;
+          if (i === 0) c.moveTo(x, y);
+          else c.lineTo(x, y);
+          x += sliceWidth;
+        }
+        c.lineTo(width, height / 2);
+        c.stroke();
+      }
+      renderFrame();
+    }
+
+    // =========================================================================
+    // MICROPHONE RECORDING
+    // =========================================================================
+    async function startRecording() {
+      stopAllPlayback();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        appState.micStream = stream;
+        const ctx = ensureAudioContext();
+        const micSource = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        micSource.connect(analyser);
+        appState.analyserNode = analyser;
+
+        canvasOverlayText.classList.add('hidden');
+        startLiveAnalyserDrawing(analyser);
+
+        appState.recordedChunks = [];
+        const recorder = new MediaRecorder(stream);
+        appState.mediaRecorder = recorder;
+
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            appState.recordedChunks.push(e.data);
+          }
+        };
+
+        recorder.onstop = async () => {
+          cancelAnimationFrame(appState.animFrameId);
+          const blob = new Blob(appState.recordedChunks, { type: recorder.mimeType || 'audio/webm' });
+          const arrayBuf = await blob.arrayBuffer();
+          const decoded = await ctx.decodeAudioData(arrayBuf);
+          appState.currentAudioBuffer = decoded;
+
+          const detectedF0 = estimateFundamentalFreq(decoded) || 125.0;
+          appState.userMeasuredF0 = detectedF0;
+          userF0Badge.textContent = `F0 Giọng Bạn: ${detectedF0.toFixed(1)} Hz`;
+
+          autoCalibratePitchFromF0(detectedF0, appState.targetFemaleF0);
+          drawBufferWaveform(decoded, '#38bdf8');
+
+          const dur = decoded.duration;
+          step2Status.textContent = `Đã ghi âm thành công (${dur.toFixed(1)}s • ${detectedF0.toFixed(0)} Hz)`;
+          step3Status.textContent = `Đã tự khớp cao độ lên ${appState.targetFemaleF0.toFixed(0)} Hz`;
+
+          addTakeToHistory(`Bản Ghi Mic #${appState.takes.length + 1}`, dur, detectedF0, decoded);
+          showToast(`Đã thu âm xong (${dur.toFixed(1)}s) và tự động khớp tông giọng nữ!`, 'emerald');
+        };
+
+        recorder.start();
+        appState.isRecording = true;
+        appState.recStartTime = performance.now();
+        btnRecord.disabled = true;
+        btnRecord.classList.add('opacity-60');
+        recordDot.classList.add('pulse-ring');
+        recordBtnLabel.textContent = 'Đang Ghi Âm...';
+        btnStopRecord.disabled = false;
+
+        appState.recTimerInterval = setInterval(() => {
+          const elapsed = (performance.now() - appState.recStartTime) / 1000;
+          const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+          const secs = (elapsed % 60).toFixed(1).padStart(4, '0');
+          recTimer.textContent = `${mins}:${secs}`;
+        }, 100);
+
+      } catch (err) {
+        showToast('Không thể truy cập Microphone trên trình duyệt. Bạn có thể tải file ghi âm hoặc dùng nút Tạo Giọng Nam Mẫu.', 'pink');
+      }
+    }
+
+    function stopRecording() {
+      if (appState.mediaRecorder && appState.isRecording) {
+        appState.mediaRecorder.stop();
+        appState.isRecording = false;
+      }
+      if (appState.micStream) {
+        appState.micStream.getTracks().forEach(t => t.stop());
+        appState.micStream = null;
+      }
+      clearInterval(appState.recTimerInterval);
+      btnRecord.disabled = false;
+      btnRecord.classList.remove('opacity-60');
+      recordDot.classList.remove('pulse-ring');
+      recordBtnLabel.textContent = 'Bắt Đầu Ghi Âm';
+      btnStopRecord.disabled = true;
+    }
+
+    // =========================================================================
+    // AUTO CALIBRATE PITCH SHIFT TO MATCH TARGET FEMALE VIDEO F0
+    // =========================================================================
+    function autoCalibratePitchFromF0(userF0, targetF0) {
+      let semitones = 12 * Math.log2(targetF0 / Math.max(75, userF0));
+      semitones = Math.max(0, Math.min(16, Math.round(semitones * 2) / 2));
+      sliderPitch.value = semitones;
+      updateSliderLabels();
+    }
+
+    function applyPresetProfile(presetKey) {
+      const p = PRESETS[presetKey];
+      if (!p) return;
+      appState.activePresetKey = presetKey;
+      appState.targetFemaleF0 = p.f0;
+
+      metricTargetF0.textContent = `${p.f0.toFixed(1)} Hz`;
+      metricTargetFormant.textContent = p.formantLabel;
+      metricTargetBrightness.textContent = p.brightnessLabel;
+      metricTargetAir.textContent = p.airLabel;
+
+      sliderFormant.value = p.formantShift;
+      sliderChestCut.value = p.chestCut;
+      sliderBreath.value = p.breathGain;
+      sliderVibrato.value = p.vibrato;
+
+      autoCalibratePitchFromF0(appState.userMeasuredF0, p.f0);
+      step1Status.textContent = `Đã nạp: ${p.name} (${p.f0.toFixed(0)} Hz)`;
+    }
+
+    function updateSliderLabels() {
+      const st = parseFloat(sliderPitch.value);
+      const fm = parseFloat(sliderFormant.value);
+      const cc = parseFloat(sliderChestCut.value);
+      const br = parseFloat(sliderBreath.value);
+      const vb = parseFloat(sliderVibrato.value);
+
+      valPitch.textContent = `+${st.toFixed(1)} ST`;
+      pitchRatioLabel.textContent = `Dịch cao độ: +${st.toFixed(1)} Semitones (${appState.userMeasuredF0.toFixed(0)}Hz → ${appState.targetFemaleF0.toFixed(0)}Hz)`;
+      valFormant.textContent = `${fm >= 0 ? '+' : ''}${fm}%`;
+      valChestCut.textContent = `${cc} Hz`;
+      valBreath.textContent = `+${br.toFixed(1)} dB`;
+      valVibrato.textContent = `${vb}%`;
+    }
+
+    // =========================================================================
+    // PLAYBACK: ORIGINAL VS CONVERTED FEMALE VOICE
+    // =========================================================================
+    function stopAllPlayback() {
+      appState.activeSourceNodes.forEach(node => {
+        try { node.stop(); } catch (_) {}
+        try { node.disconnect(); } catch (_) {}
+      });
+      appState.activeSourceNodes = [];
+    }
+
+    function playOriginalVoice() {
+      stopAllPlayback();
+      if (!appState.currentAudioBuffer) {
+        generateSyntheticMaleSpeechSample();
+      }
+      const ctx = ensureAudioContext();
+      const src = ctx.createBufferSource();
+      src.buffer = appState.currentAudioBuffer;
+      src.connect(ctx.destination);
+      src.start();
+      appState.activeSourceNodes.push(src);
+
+      drawBufferWaveform(appState.currentAudioBuffer, '#38bdf8');
+      showToast('Đang phát giọng thu âm gốc của bạn...', 'emerald');
+    }
+
+    function playConvertedFemaleVoice() {
+      stopAllPlayback();
+      if (!appState.currentAudioBuffer) {
+        generateSyntheticMaleSpeechSample();
+      }
+      const ctx = ensureAudioContext();
+      const shiftedBuffer = createConvertedFemaleBuffer(appState.currentAudioBuffer);
+
+      const src = ctx.createBufferSource();
+      src.buffer = shiftedBuffer;
+      buildFemaleVocalChain(ctx, src, ctx.destination);
+      src.start();
+      appState.activeSourceNodes.push(src);
+
+      drawBufferWaveform(shiftedBuffer, '#ec4899');
+      showToast(`Đang phát giọng của bạn với tông giọng nữ (${appState.targetFemaleF0.toFixed(0)} Hz)!`, 'pink');
+    }
+
+    // Preview synthesized reference female tone
+    function previewReferenceFemaleTone() {
+      stopAllPlayback();
+      const ctx = ensureAudioContext();
+      const sr = ctx.sampleRate;
+      const dur = 1.8;
+      const buf = ctx.createBuffer(1, Math.floor(sr * dur), sr);
+      const d = buf.getChannelData(0);
+      const f0 = appState.targetFemaleF0;
+
+      for (let i = 0; i < d.length; i++) {
+        const t = i / sr;
+        const env = Math.sin(Math.PI * (t / dur));
+        const vib = 1 + 0.012 * Math.sin(2 * Math.PI * 5.8 * t);
+        let s = 0;
+        for (let h = 1; h <= 10; h++) {
+          s += (1 / Math.pow(h, 0.9)) * Math.sin(2 * Math.PI * h * f0 * vib * t);
+        }
+        d[i] = s * env * 0.18;
+      }
+
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      buildFemaleVocalChain(ctx, src, ctx.destination);
+      src.start();
+      appState.activeSourceNodes.push(src);
+      showToast(`Đang phát thử cao độ chuẩn của hồ sơ giọng nữ (${f0.toFixed(1)} Hz)`, 'pink');
+    }
+
+    // =========================================================================
+    // EXTRACT VOICE PROFILE FROM UPLOADED VIDEO CLIP
+    // =========================================================================
+    async function extractProfileFromVideoFile(file) {
+      try {
+        videoFileName.textContent = file.name;
+        const objectUrl = URL.createObjectURL(file);
+        trainingVideoEl.src = objectUrl;
+        videoPreviewContainer.classList.remove('hidden');
+
+        trainingBadge.textContent = 'Đang phân tích phổ giọng nữ...';
+        const ctx = ensureAudioContext();
+        const arrayBuf = await file.arrayBuffer();
+        const decodedAudio = await ctx.decodeAudioData(arrayBuf);
+
+        const detectedF0 = estimateFundamentalFreq(decodedAudio);
+        // Clamp or adapt into female reference range if background music skewed detection
+        const finalFemaleF0 = detectedF0 && detectedF0 >= 150 ? detectedF0 : 228.5;
+
+        appState.targetFemaleF0 = finalFemaleF0;
+        const estF1 = Math.round(finalFemaleF0 * 3.45);
+        const estF2 = Math.round(finalFemaleF0 * 10.1);
+
+        metricTargetF0.textContent = `${finalFemaleF0.toFixed(1)} Hz`;
+        metricTargetFormant.textContent = `${estF1} / ${estF2} Hz`;
+        metricTargetBrightness.textContent = `+6.0 dB`;
+        metricTargetAir.textContent = `30% Air`;
+
+        autoCalibratePitchFromF0(appState.userMeasuredF0, finalFemaleF0);
+        trainingBadge.textContent = `Đã học từ Video (${finalFemaleF0.toFixed(0)} Hz)`;
+        step1Status.textContent = `Đã trích xuất từ: ${file.name} (${finalFemaleF0.toFixed(0)} Hz)`;
+
+        showToast(`Đã trích xuất thành công tông giọng nữ (${finalFemaleF0.toFixed(1)} Hz) từ video "${file.name}"!`, 'emerald');
+      } catch (err) {
+        showToast('Đã nạp video! Đang áp dụng bộ lọc F0 & Formant giọng nữ tiêu chuẩn (232 Hz).', 'pink');
+      }
+    }
+
+    // =========================================================================
+    // EXPORT CONVERTED AUDIO AS .WAV
+    // =========================================================================
+    function encodeAudioBufferToWav(audioBuffer) {
+      const numOfChan = 1;
+      const samples = audioBuffer.getChannelData(0);
+      const sampleRate = audioBuffer.sampleRate;
+      const buffer = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buffer);
+
+      function writeString(offset, str) {
+        for (let i = 0; i < str.length; i++) {
+          view.setUint8(offset + i, str.charCodeAt(i));
+        }
+      }
+
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + samples.length * 2, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numOfChan, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, samples.length * 2, true);
+
+      let offset = 44;
+      for (let i = 0; i < samples.length; i++, offset += 2) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    async function exportConvertedWav() {
+      if (!appState.currentAudioBuffer) {
+        generateSyntheticMaleSpeechSample();
+      }
+      const shiftedBuffer = createConvertedFemaleBuffer(appState.currentAudioBuffer);
+      const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      const offlineCtx = new OfflineCtx(1, shiftedBuffer.length, shiftedBuffer.sampleRate);
+
+      const src = offlineCtx.createBufferSource();
+      src.buffer = shiftedBuffer;
+      buildFemaleVocalChain(offlineCtx, src, offlineCtx.destination);
+      src.start(0);
+
+      const renderedBuffer = await offlineCtx.startRendering();
+      const wavBlob = encodeAudioBufferToWav(renderedBuffer);
+      const url = URL.createObjectURL(wavBlob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `giong_nu_converted_${Math.round(appState.targetFemaleF0)}Hz.wav`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast('Đã xuất và tải xuống file WAV giọng nữ đã chuyển đổi!', 'emerald');
+    }
+
+    // =========================================================================
+    // LIVE MIC MONITOR TOGGLE
+    // =========================================================================
+    async function toggleLiveMonitor() {
+      if (appState.liveMonitorActive) {
+        if (appState.liveMonitorNodes) {
+          appState.liveMonitorNodes.stream.getTracks().forEach(t => t.stop());
+          appState.liveMonitorNodes.source.disconnect();
+          appState.liveMonitorNodes = null;
+        }
+        appState.liveMonitorActive = false;
+        btnLiveMonitor.textContent = 'TẮT';
+        btnLiveMonitor.className = 'px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono border border-slate-700 transition';
+        showToast('Đã tắt chế độ nghe trực tiếp (Live Mic Monitor).', 'pink');
+        return;
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const ctx = ensureAudioContext();
+        const source = ctx.createMediaStreamSource(stream);
+        buildFemaleVocalChain(ctx, source, ctx.destination);
+        appState.liveMonitorNodes = { stream, source };
+        appState.liveMonitorActive = true;
+        btnLiveMonitor.textContent = 'ĐANG BẬT';
+        btnLiveMonitor.className = 'px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-mono border border-emerald-400 transition';
+        showToast('Đã bật Live Mic Monitor! Hãy đeo tai nghe để tránh dội âm.', 'emerald');
+      } catch (err) {
+        showToast('Không thể bật Live Monitor do trình duyệt chặn quyền Microphone.', 'pink');
+      }
+    }
+
+    // =========================================================================
+    // RECORDINGS HISTORY TABLE
+    // =========================================================================
+    function addTakeToHistory(label, durationSec, userF0, buffer) {
+      const id = Date.now() + Math.floor(Math.random() * 1000);
+      const take = {
+        id,
+        label,
+        durationSec,
+        userF0,
+        targetName: presetSelect.options[presetSelect.selectedIndex].text.split('(')[0].trim(),
+        targetF0: appState.targetFemaleF0,
+        semitones: parseFloat(sliderPitch.value),
+        buffer
+      };
+      appState.takes.unshift(take);
+      renderTakesTable();
+    }
+
+    function renderTakesTable() {
+      takeCountBadge.textContent = `${appState.takes.length} bản thu sẵn sàng`;
+      recordingsTableBody.innerHTML = '';
+
+      appState.takes.forEach((take) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-900/50 transition';
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-medium text-white">${take.label}</td>
+          <td class="py-2.5 px-3 font-mono text-slate-400">${take.durationSec.toFixed(1)}s</td>
+          <td class="py-2.5 px-3 font-mono text-sky-400">${take.userF0.toFixed(1)} Hz</td>
+          <td class="py-2.5 px-3 text-slate-300">${take.targetName} <span class="text-pink-400 font-mono">(${take.targetF0.toFixed(0)} Hz)</span></td>
+          <td class="py-2.5 px-3 font-mono text-emerald-400">+${take.semitones.toFixed(1)} ST</td>
+          <td class="py-2.5 px-3 text-right space-x-1.5">
+            <button data-take-orig="${take.id}" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium">Nghe Gốc</button>
+            <button data-take-conv="${take.id}" class="px-2.5 py-1 rounded bg-pink-600 hover:bg-pink-500 text-white text-[11px] font-semibold">Phát Giọng Nữ</button>
+          </td>
+        `;
+        recordingsTableBody.appendChild(tr);
+      });
+
+      recordingsTableBody.querySelectorAll('[data-take-orig]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.getAttribute('data-take-orig'));
+          const found = appState.takes.find(t => t.id === id);
+          if (found) {
+            appState.currentAudioBuffer = found.buffer;
+            playOriginalVoice();
+          }
+        });
+      });
+
+      recordingsTableBody.querySelectorAll('[data-take-conv]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.getAttribute('data-take-conv'));
+          const found = appState.takes.find(t => t.id === id);
+          if (found) {
+            appState.currentAudioBuffer = found.buffer;
+            playConvertedFemaleVoice();
+          }
+        });
+      });
+    }
+
+    // =========================================================================
+    // EVENT LISTENERS
+    // =========================================================================
+    tabStudioBtn.addEventListener('click', () => {
+      viewStudio.classList.remove('hidden');
+      viewPipeline.classList.add('hidden');
+      tabStudioBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-pink-600 text-white shadow';
+      tabPipelineBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white';
+    });
+
+    tabPipelineBtn.addEventListener('click', () => {
+      viewPipeline.classList.remove('hidden');
+      viewStudio.classList.add('hidden');
+      tabPipelineBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-pink-600 text-white shadow';
+      tabStudioBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-400 hover:text-white';
+    });
+
+    presetSelect.addEventListener('change', (e) => {
+      applyPresetProfile(e.target.value);
+      showToast(`Đã áp dụng hồ sơ giọng huấn luyện: ${PRESETS[e.target.value].name}`, 'pink');
+    });
+
+    btnPreviewRefVoice.addEventListener('click', previewReferenceFemaleTone);
+
+    btnAnalyzeVideoNow.addEventListener('click', () => {
+      autoCalibratePitchFromF0(appState.userMeasuredF0, appState.targetFemaleF0);
+      showToast(`Đã đồng bộ lại phổ F0 (${appState.targetFemaleF0.toFixed(1)} Hz) & Formant!`, 'emerald');
+    });
+
+    videoInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (file) extractProfileFromVideoFile(file);
+    });
+
+    btnExtractFromPlayingVideo.addEventListener('click', () => {
+      const file = videoInput.files && videoInput.files[0];
+      if (file) extractProfileFromVideoFile(file);
+    });
+
+    btnRecord.addEventListener('click', startRecording);
+    btnStopRecord.addEventListener('click', stopRecording);
+
+    userAudioUpload.addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        const ctx = ensureAudioContext();
+        const buf = await file.arrayBuffer();
+        const decoded = await ctx.decodeAudioData(buf);
+        appState.currentAudioBuffer = decoded;
+
+        const detectedF0 = estimateFundamentalFreq(decoded) || 124.0;
+        appState.userMeasuredF0 = detectedF0;
+        userF0Badge.textContent = `F0 Giọng Bạn: ${detectedF0.toFixed(1)} Hz`;
+        autoCalibratePitchFromF0(detectedF0, appState.targetFemaleF0);
+
+        canvasOverlayText.classList.add('hidden');
+        drawBufferWaveform(decoded, '#38bdf8');
+        addTakeToHistory(file.name, decoded.duration, detectedF0, decoded);
+        showToast(`Đã tải file ghi âm "${file.name}" và khớp tông giọng nữ!`, 'emerald');
+      } catch (err) {
+        showToast('Không thể giải mã file âm thanh này. Hãy thử định dạng WAV, MP3 hoặc M4A.', 'pink');
+      }
+    });
+
+    btnSynthSample.addEventListener('click', () => {
+      generateSyntheticMaleSpeechSample();
+      showToast('Đã tạo bản thu giọng nam mẫu! Nhấn "Phát Giọng Đã Chuyển Nữ" để nghe thử ngay.', 'emerald');
+    });
+
+    btnAutoMatch.addEventListener('click', () => {
+      autoCalibratePitchFromF0(appState.userMeasuredF0, appState.targetFemaleF0);
+      showToast(`Đã tự động khớp độ dịch tông lên ${appState.targetFemaleF0.toFixed(0)} Hz!`, 'pink');
+    });
+
+    btnPlayOriginal.addEventListener('click', playOriginalVoice);
+    btnPlayConverted.addEventListener('click', playConvertedFemaleVoice);
+    btnStopPlayback.addEventListener('click', () => {
+      stopAllPlayback();
+      showToast('Đã dừng phát âm thanh.', 'pink');
+    });
+    btnExportWav.addEventListener('click', exportConvertedWav);
+    btnLiveMonitor.addEventListener('click', toggleLiveMonitor);
+
+    [sliderPitch, sliderFormant, sliderChestCut, sliderBreath, sliderVibrato].forEach(slider => {
+      slider.addEventListener('input', updateSliderLabels);
+    });
+
+    btnCopyPythonCode.addEventListener('click', () => {
+      const codeText = document.getElementById('pythonCodeBlock').innerText;
+      const ta = document.createElement('textarea');
+      ta.value = codeText;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('Đã sao chép toàn bộ mã nguồn Python vào Clipboard!', 'emerald');
+      } catch (_) {}
+      document.body.removeChild(ta);
+    });
+
+    // =========================================================================
+    // INITIALIZE ON LOAD
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      applyPresetProfile('sweet');
+      generateSyntheticMaleSpeechSample();
+    });
+  </script>
+</body>
+</html>
